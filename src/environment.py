@@ -47,22 +47,78 @@ class ChessEnv(object):
                     _actions.append(_letters[l_o] + _numbers[6] + _letters[l_o + 1] + _numbers[7] + p)
         return _actions
 
-    @staticmethod
-    def board2state(board: chess.Board) -> np.ndarray:
-        """Convert the board to 3-D numpy array
+    def board2state(self) -> Any:
+        """Convert the board to state
         :param
             board(chess.Board): the chessboard class
         :return:
-            numpy.ndarray: 3-D numpy array which sized (12,8,8) represent the board which is sparse and contain only 1 and 0
+            numpy.ndarray(17): [
+            // turn
+            is_white_turn,
+            // castling rights
+            castling_rights_white_king_side,
+            castling_rights_white_queen_side,
+            castling_rights_black_king_size,
+            castling_rights_black_queen_size,
+            // number of each pieces
+            number_of_white_pawn,
+            number_of_white_rook,
+            number_of_white_knight,
+            number_of_white_bishop,
+            number_of_white_queen,
+            number_of_white_king,
+            number_of_black_pawn,
+            number_of_black_rook,
+            number_of_black_knight,
+            number_of_black_bishop,
+            number_of_black_queen,
+            number_of_black_king,
+            ],
+            numpy.ndarray(len(actions)): [1 or 0 indicate i-th action is legal],
+            numpy.ndarray(12,64): represent board,
+            numpy.ndarray(128,64): 2 attack map of white and black
         """
-        _state = np.zeros(shape=(12, 8, 8), dtype=np.int32)
-        _lines = board.__str__().split('\n')
-        _dict = {'r': 0, 'n': 1, 'b': 2, 'q': 3, 'k': 4, 'p': 5, 'R': 6, 'N': 7, 'B': 8, 'Q': 9, 'K': 10, 'P': 11}
-        for i in range(8):
-            for j in range(8):
-                if _lines[i][j * 2] != '.':
-                    _state[_dict[_lines[i][j * 2]]][i][j] = 1
-        return _state
+        _board_overview = np.zeros(shape=17, dtype=np.int32)
+        _board_overview[0] = self.turn
+        _board_overview[1] = self.board.has_kingside_castling_rights(chess.WHITE)
+        _board_overview[2] = self.board.has_queenside_castling_rights(chess.WHITE)
+        _board_overview[3] = self.board.has_kingside_castling_rights(chess.BLACK)
+        _board_overview[4] = self.board.has_queenside_castling_rights(chess.BLACK)
+        _board_overview[5] = len(self.board.pieces(chess.PAWN, chess.WHITE))
+        _board_overview[6] = len(self.board.pieces(chess.ROOK, chess.WHITE))
+        _board_overview[7] = len(self.board.pieces(chess.KNIGHT, chess.WHITE))
+        _board_overview[8] = len(self.board.pieces(chess.BISHOP, chess.WHITE))
+        _board_overview[9] = len(self.board.pieces(chess.QUEEN, chess.WHITE))
+        _board_overview[10] = len(self.board.pieces(chess.KING, chess.WHITE))
+        _board_overview[11] = len(self.board.pieces(chess.PAWN, chess.BLACK))
+        _board_overview[12] = len(self.board.pieces(chess.ROOK, chess.BLACK))
+        _board_overview[13] = len(self.board.pieces(chess.KNIGHT, chess.BLACK))
+        _board_overview[14] = len(self.board.pieces(chess.BISHOP, chess.BLACK))
+        _board_overview[15] = len(self.board.pieces(chess.QUEEN, chess.BLACK))
+        _board_overview[16] = len(self.board.pieces(chess.KING, chess.BLACK))
+        _legal_actions = np.zeros(shape=len(self.actions), dtype=np.int32)
+        for i in range(len(self.actions)):
+            if chess.Move.from_uci(self.actions[i]) in self.board.legal_moves:
+                _legal_actions[i] = 1
+        _piece_positions = np.zeros(shape=(12, 64), dtype=np.int32)
+        _piece_positions[0][list(game.board.pieces(chess.PAWN, chess.WHITE))] = 1
+        _piece_positions[1][list(game.board.pieces(chess.ROOK, chess.WHITE))] = 1
+        _piece_positions[2][list(game.board.pieces(chess.KNIGHT, chess.WHITE))] = 1
+        _piece_positions[3][list(game.board.pieces(chess.BISHOP, chess.WHITE))] = 1
+        _piece_positions[4][list(game.board.pieces(chess.QUEEN, chess.WHITE))] = 1
+        _piece_positions[5][list(game.board.pieces(chess.KING, chess.WHITE))] = 1
+        _piece_positions[6][list(game.board.pieces(chess.PAWN, chess.BLACK))] = 1
+        _piece_positions[7][list(game.board.pieces(chess.ROOK, chess.BLACK))] = 1
+        _piece_positions[8][list(game.board.pieces(chess.KNIGHT, chess.BLACK))] = 1
+        _piece_positions[9][list(game.board.pieces(chess.BISHOP, chess.BLACK))] = 1
+        _piece_positions[10][list(game.board.pieces(chess.QUEEN, chess.BLACK))] = 1
+        _piece_positions[11][list(game.board.pieces(chess.KING, chess.BLACK))] = 1
+        _attack_map = np.zeros(shape=(128, 64), dtype=np.int32)
+        for i in range(0, 64):
+            _attack_map[i][list(self.board.attackers(chess.WHITE, i))] = 1
+        for i in range(64, 128):
+            _attack_map[i][list(self.board.attackers(chess.BLACK, i))] = 1
+        return _board_overview, _legal_actions, _piece_positions
 
     @property
     def turn(self) -> bool:
@@ -70,7 +126,7 @@ class ChessEnv(object):
         :return:
             bool: current turn. True for current turn is White's turn, False is Black's turn
         """
-        return self.board.turn
+        return self.board.turn == chess.WHITE
 
     @property
     def done(self) -> bool:
@@ -91,7 +147,7 @@ class ChessEnv(object):
         else:
             return None
 
-    def reset(self, fen: str = None) -> np.ndarray:
+    def reset(self, fen: str = None) -> Any:
         """Reset the game
         :param
             fen(str): the initial configuration for the board. None for default setting
@@ -102,28 +158,26 @@ class ChessEnv(object):
             self.board = chess.Board(fen=fen)
         else:
             self.board = chess.Board()
-        return ChessEnv.board2state(self.board)
+        return self.board2state()
 
     def step(self, action: int) -> Any:
         """Make an action in the environment
         :param
             action(int): choose the action
         :return:
-            tuple(numpy.ndarray, float, bool, Any): next_state, reward, done, info. Following openai-gym's env
+            tuple(tuple of np.ndarray, float, bool, Any): next_state, reward, done, info. Following openai-gym's env
             if move is illegal then reward is -0.5
             reward is 1 if win, -1 if lose. -0.5 if draw
         """
         _action = self.actions[action]
-        _next_state = np.zeros(shape=(12, 8, 8), dtype=np.int32)
         _reward = 0
         _legal_move = chess.Move.from_uci(_action) in self.board.legal_moves
         _current_turn = self.turn
         if _legal_move:
             self.board.push_uci(_action)
-            _next_state = ChessEnv.board2state(self.board)
         else:
-            _reward = -0.5
-            _next_state = ChessEnv.board2state(self.board)
+            _reward = 0
+        _next_state = self.board2state()
         if self.done:
             if self.result == '1-0':
                 if _current_turn:
@@ -136,7 +190,7 @@ class ChessEnv(object):
                 else:
                     _reward = 1
             else:
-                _reward = -0.5
+                _reward = 0
         return _next_state, _reward, self.done, None
 
 
@@ -144,8 +198,24 @@ if __name__ == '__main__':
     """For testing purpose only
     """
     game = ChessEnv()
-    state = game.reset()
-    ns, r, d, _ = game.step(928)
-    print(r, d, game.result)
+    state = game.reset(fen='rnbqkbnr/ppp3pp/2p3p1/2p5/8/5Q2/PPPPPPPP/RNB1KBNR w KQkq -')
+    game.board.push_uci('f3e3')
+    print(game.board.is_check())
+    print(game.board.was_into_check())
+    # for action in game.actions:
+    #     if chess.Move.from_uci(action) in game.board.legal_moves:
+    #         print(action)
+    # game.board.push_uci('d8e7')
+    # game.board.push_uci('c7c8q')
+    # print(r, d, game.result)
     print(game.board)
-    print(len(game.actions))
+    # print(game.board.attackers(chess.WHITE, chess.D2))
+    x = np.zeros(shape=(12, 64), dtype=np.int32)
+    x[0][list(game.board.pieces(chess.PAWN, chess.WHITE))] = 1
+    print(x[0])
+    print(list(game.board.attackers(chess.WHITE, 11)))
+    # is_check() after move then if current side still check
+    # was_into_check() the move check or not
+    # castling_rights
+    # turn
+    # attacks(square)
