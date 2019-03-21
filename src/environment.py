@@ -117,8 +117,8 @@ class ChessEnv(object):
         for i in range(0, 64):
             _attack_map[i][list(self.board.attackers(chess.WHITE, i))] = 1
         for i in range(64, 128):
-            _attack_map[i][list(self.board.attackers(chess.BLACK, i))] = 1
-        return _board_overview, _legal_actions, _piece_positions
+            _attack_map[i][list(self.board.attackers(chess.BLACK, i - 64))] = 1
+        return _board_overview, _legal_actions, _piece_positions, _attack_map
 
     @property
     def turn(self) -> bool:
@@ -177,7 +177,7 @@ class ChessEnv(object):
             self.board.push_uci(_action)
         else:
             _reward = 0
-        _next_state = self.board2state()
+        _ns_board_overview, _ns_legal_actions, _ns_piece_positions, _ns_attack_map = self.board2state()
         if self.done:
             if self.result == '1-0':
                 if _current_turn:
@@ -191,7 +191,7 @@ class ChessEnv(object):
                     _reward = 1
             else:
                 _reward = 0
-        return _next_state, _reward, self.done, None
+        return _ns_board_overview, _ns_legal_actions, _ns_piece_positions, _ns_attack_map, _reward, self.done, None
 
 
 if __name__ == '__main__':
