@@ -2,6 +2,11 @@ from typing import Any
 import numpy as np
 import chess
 
+import sys
+import os
+sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../')))
+from CP_CHESS.utils.board2state import Board2State0 as board2state
+
 
 class ChessEnv(object):
     """
@@ -69,7 +74,7 @@ class ChessEnv(object):
         :param
             fen(str): the initial configuration for the board. None for default setting
         :return:
-            numpy.ndarray: the board's current state
+            str, Any: type of state parser, the board's current state
         """
         if fen is not None:
             self.board = chess.Board(fen=fen)
@@ -77,15 +82,18 @@ class ChessEnv(object):
             self.board = chess.Board()
         _next_state = None
         if board2state is not None:
-            _next_state = board2state(self.board, self.actions)
-        return _next_state
+            _next_state_bs = board2state(self.board, self.actions)
+            _next_state = _next_state_bs.eval()
+            del _next_state_bs
+        return board2state.__name__, _next_state
 
     def step(self, action: int, board2state: Any = None) -> Any:
         """Make an action in the environment
         :param
             action(int): choose the action
         :return:
-            tuple(tuple of np.ndarray, float, bool, Any): next_state, reward, done, info. Following openai-gym's env
+            str: type of state parser,
+            tuple(Any, float, bool, Any): next_state, reward, done, info. Following openai-gym's env
             if move is illegal then reward is -0.5
             reward is 1 if win, -1 if lose. -0.5 if draw
         """
@@ -112,19 +120,18 @@ class ChessEnv(object):
                 _reward = 0
         _next_state = None
         if board2state is not None:
-            _next_state = board2state(self.board, self.actions)
-        return _next_state, _reward, self.done, None
+            _next_state_bs = board2state(self.board, self.actions)
+            _next_state = _next_state_bs.eval()
+            del _next_state_bs
+        return board2state.__name__, _next_state, _reward, self.done, None
 
 
 if __name__ == '__main__':
     """For testing purpose only
     """
-    import sys
-    sys.path.append('../')
-    from CP_CHESS.utils.board2state import board2state0 as board2state
     game = ChessEnv()
-    a = game.reset(fen=None, board2state=board2state)
-    a, b, c, d = game.step(928, board2state=board2state)
+    tp, a = game.reset(fen=None, board2state=board2state)
+    tp, a, b, c, d = game.step(928, board2state=board2state)
     # game.board.push_uci('e2e4')
     print(game.board.is_check())
     print(game.board.was_into_check())
@@ -138,6 +145,7 @@ if __name__ == '__main__':
     # print(game.board.attackers(chess.WHITE, chess.D2))
     x = np.zeros(shape=(12, 64), dtype=np.int32)
     print(a[0].shape, a[1].shape, a[2].shape, a[3].shape, b, c, d)
+    print(tp, a[0])
     # is_check() after move then if current side still check
     # was_into_check() the move check or not
     # castling_rights
