@@ -35,11 +35,14 @@ class Model(object):
         self.ns_merged = self.feature_extraction(self.next_state_overview, self.next_state_piece_positions, self.next_state_attack_map)
         self.s_merged_shape = 416
         # Curiosity block
-        self.curious_params, self.curious_out, self.int_reward = self.build_curiosity_net(self.ns_merged, self.s_merged_shape, '', 'Curiosity')
+        self.curious_params, self.curious_out, self.int_reward = self.build_curiosity_net(self.ns_merged, self.s_merged_shape, '', 'dyn_net')
+        self.clipped_int_reward = tf.clip_by_value(self.int_reward, 0, 1)  # experiment
         self.curiosity_optimizer = tf.train.RMSPropOptimizer(self.config.cs_lr).minimize(tf.reduce_mean(self.int_reward), var_list=self.curious_params)
         # Actor block
-        with tf.variable_scope('Actor'):
-            pass
+        self.a_params, self.a_dist = self.build_actor_net(self.s_merged, self.state_legal_actions, self.config.n_action, '', 'pi')
+        self.a_log_prob = tf.log(tf.reduce_sum(self.action * self.a_dist))
+        self.a_obj_f = tf.reduce_mean(self.a_log_prob * self.advantage)
+        self.actor_optimizer = tf.train.RMSPropOptimizer(self.config.a_lr).minimize(- self.a_obj_f, var_list=self.a_params)
         # Critic block
         with tf.variable_scope('Critic'):
             pass
@@ -66,18 +69,45 @@ class Model(object):
             full_path = outer_scope + '/' + name
         else:
             full_path = name
-        rand_encode_ns = tf.layers.Dense(units=512, activation=tf.nn.relu, trainable=trainable)(input_tensor)
-        rand_encode_ns_predictor = tf.layers.Dense(units=output_shape, activation=tf.nn.relu, trainable=trainable)(rand_encode_ns)
-        int_reward = tf.reduce_sum(tf.square(input_tensor - rand_encode_ns_predictor, trainable=trainable), axis=1)
+        with tf.variable_scope(name):
+            rand_encode_ns = tf.layers.Dense(
+                units=512,
+                activation=tf.nn.relu,
+                trainable=trainable,
+            )(input_tensor)
+            rand_encode_ns_predictor = tf.layers.Dense(
+                units=output_shape,
+                activation=tf.nn.relu,
+                trainable=trainable,
+                name='curiosity_output'
+            )(rand_encode_ns)
+            int_reward = tf.reduce_sum(tf.square(input_tensor - rand_encode_ns_predictor), axis=1)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=full_path)
         return params, rand_encode_ns_predictor, int_reward
 
     @staticmethod
-    def build_actor_net(self, input_tensor: Any, outer_scope: str, name: str, trainable: bool = True) -> Any:
-        pass
+    def build_actor_net(input_tensor: Any, legal_action: Any, n_action: int, outer_scope: str, name: str, trainable: bool = True) -> Any:
+        if outer_scope and outer_scope.strip():
+            full_path = outer_scope + '/' + name
+        else:
+            full_path = name
+        with tf.variable_scope(name):
+            l1 = tf.layers.Dense(
+                units=512,
+                activation=tf.nn.relu,
+                trainable=trainable,
+            )(input_tensor)
+            l1 = tf.layers.Dense(
+                units=n_action,
+                activation=tf.nn.relu
+            )(l1)
+            l1_filtered = l1 * legal_action
+            action_distribution = tf.nn.softmax(l1_filtered, axis=1, name='action_distribution')
+        params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=full_path)
+        return params, action_distribution
 
     @staticmethod
-    def build_critic_net(self, input_tensor: Any, outer_scope: str, name: str, trainable: bool = True) -> Any:
+    def build_critic_net(input_tensor: Any, outer_scope: str, name: str, trainable: bool = True) -> Any:
         pass
 
     @staticmethod
