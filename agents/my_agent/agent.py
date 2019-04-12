@@ -15,10 +15,7 @@ class Agent(object):
 
     def action(self, state_type: str, state: Any, play: bool = False) -> int:
         _action = 0
-        if play:
-            _action = self.model.play(state)
-        else:
-            _action = self.model.predict(state)
+        _action = self.model.act(state, play=play)
         print(state[0].shape, state[1].shape, state[2].shape, state[3].shape)
         return _action
 

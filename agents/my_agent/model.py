@@ -30,60 +30,68 @@ class Model(object):
         self.v_next = tf.placeholder(tf.float32, [None, 1], 'v_next')
         self.advantage = tf.placeholder(tf.float32, [None, 1], 'advantage')
         self.total_reward = tf.placeholder(tf.float32, [None, 1], 'total_reward')
-
-        self.s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
-        self.ns_merged = self.feature_extraction(self.next_state_overview, self.next_state_piece_positions, self.next_state_attack_map)
+        # Feature extraction block
+        self.a_s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
         self.s_merged_shape = 416
+        self.a_ns_merged = tf.placeholder(tf.float32, [None, self.s_merged_shape], 'ns_merged')
         # Curiosity block
-        self.curious_params, self.curious_out, self.int_reward = self.build_curiosity_net(self.ns_merged, self.s_merged_shape, '', 'dyn_net')
+        self.curious_params, self.curious_out, self.int_reward = self.build_curiosity_net(self.a_s_merged, self.action, self.a_ns_merged, self.s_merged_shape, '', 'dyn_net')
         self.clipped_int_reward = tf.clip_by_value(self.int_reward, 0, 1)  # experiment
-        self.curiosity_optimizer = tf.train.RMSPropOptimizer(self.config.cs_lr).minimize(tf.reduce_mean(self.int_reward), var_list=self.curious_params)
+        self.cr_obj_f = tf.reduce_mean(self.int_reward)
+        self.curiosity_optimizer = tf.train.RMSPropOptimizer(self.config.cs_lr).minimize(self.cr_obj_f, var_list=self.curious_params)
         # Actor block
-        self.a_params, self.a_dist = self.build_actor_net(self.s_merged, self.state_legal_actions, self.config.n_action, '', 'pi')
+        self.a_params, self.a_dist = self.build_actor_net(self.a_s_merged, self.state_legal_actions, self.config.n_action, '', 'pi')
         self.a_log_prob = tf.log(tf.reduce_sum(self.action * self.a_dist))
         self.a_obj_f = tf.reduce_mean(self.a_log_prob * self.advantage)
-        self.actor_optimizer = tf.train.RMSPropOptimizer(self.config.a_lr).minimize(- self.a_obj_f, var_list=self.a_params)
+        self.actor_optimizer = tf.train.RMSPropOptimizer(self.config.a_lr).minimize(-self.a_obj_f)
         # Critic block
-        with tf.variable_scope('Critic'):
-            pass
-
-        with tf.Session() as sess:
-            sess.run(tf.initializers.global_variables())
-            print(
-                sess.run(
-                    [tf.shape(self.s_merged)],
-                    feed_dict={
-                        self.state_overview: np.ones((10, 17), dtype=np.int32),
-                        self.state_piece_positions: np.ones((10, 12, 64), dtype=np.int32),
-                        self.state_attack_map: np.ones((10, 128, 64), dtype=np.int32)
-                    }
-                )
-            )
-
+        self.c_s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
+        self.c_params, self.c_v = self.build_critic_net(self.c_s_merged, '', 'critic')
+        self.c_adv = self.total_reward + self.config.GAMMA * self.v_next - self.c_v
+        self.c_obj_f = tf.reduce_mean(tf.square(self.c_adv))
+        self.critic_optimizer = tf.train.RMSPropOptimizer(self.config.c_lr).minimize(self.cr_obj_f)
+        # utility
         self.saver = tf.train.Saver()
         self.sess = tf.Session()
+        # test
+        # self.sess.run(tf.initializers.global_variables())
+        # ns_mg = self.sess.run(self.a_s_merged, feed_dict={
+        #     self.state_overview: np.zeros((2, 17)),
+        #     self.state_legal_actions: np.ones((2, self.config.n_action)),
+        #     self.state_piece_positions: np.zeros((2, 12, 64)),
+        #     self.state_attack_map: np.ones((2, 128, 64)),
+        # })
+        # print(self.sess.run(self.int_reward, feed_dict={
+        #     self.state_overview: np.zeros((2, 17)),
+        #     self.state_legal_actions: np.ones((2, self.config.n_action)),
+        #     self.state_piece_positions: np.zeros((2, 12, 64)),
+        #     self.state_attack_map: np.ones((2, 128, 64)),
+        #     self.action: np.zeros((2, self.config.n_action)),
+        #     self.a_ns_merged: ns_mg,
+        # }))
 
     @staticmethod
-    def build_curiosity_net(input_tensor: Any, output_shape: int, outer_scope: str, name: str, trainable: bool = True) -> Any:
+    def build_curiosity_net(s_tensor: Any, a_tensor: Any, ns_tensor: Any, ns_shape: int, outer_scope: str, name: str, trainable: bool = True) -> Any:
         if outer_scope and outer_scope.strip():
             full_path = outer_scope + '/' + name
         else:
             full_path = name
         with tf.variable_scope(name):
-            rand_encode_ns = tf.layers.Dense(
+            concat_tensor = tf.concat([s_tensor, tf.cast(a_tensor, dtype=tf.float32)], axis=1)
+            l1 = tf.layers.Dense(
                 units=512,
                 activation=tf.nn.relu,
                 trainable=trainable,
-            )(input_tensor)
-            rand_encode_ns_predictor = tf.layers.Dense(
-                units=output_shape,
+            )(concat_tensor)
+            ns_predictor = tf.layers.Dense(
+                units=ns_shape,
                 activation=tf.nn.relu,
                 trainable=trainable,
                 name='curiosity_output'
-            )(rand_encode_ns)
-            int_reward = tf.reduce_sum(tf.square(input_tensor - rand_encode_ns_predictor), axis=1)
+            )(l1)
+            int_reward = tf.reduce_sum(tf.square(ns_tensor - ns_predictor), axis=1)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=full_path)
-        return params, rand_encode_ns_predictor, int_reward
+        return params, ns_predictor, int_reward
 
     @staticmethod
     def build_actor_net(input_tensor: Any, legal_action: Any, n_action: int, outer_scope: str, name: str, trainable: bool = True) -> Any:
@@ -99,7 +107,8 @@ class Model(object):
             )(input_tensor)
             l1 = tf.layers.Dense(
                 units=n_action,
-                activation=tf.nn.relu
+                activation=tf.nn.relu,
+                trainable=trainable,
             )(l1)
             l1_filtered = l1 * legal_action
             action_distribution = tf.nn.softmax(l1_filtered, axis=1, name='action_distribution')
@@ -108,7 +117,23 @@ class Model(object):
 
     @staticmethod
     def build_critic_net(input_tensor: Any, outer_scope: str, name: str, trainable: bool = True) -> Any:
-        pass
+        if outer_scope and outer_scope.strip():
+            full_path = outer_scope + '/' + name
+        else:
+            full_path = name
+        with tf.variable_scope(name):
+            l1 = tf.layers.Dense(
+                units=512,
+                activation=tf.nn.relu,
+                trainable=trainable,
+            )(input_tensor)
+            v = tf.layers.Dense(
+                units=1,
+                activation=tf.nn.relu,
+                trainable=trainable,
+            )(l1)
+        params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=full_path)
+        return params, v
 
     @staticmethod
     def update_network_op(origin: Any, target: Any, tau: float = None) -> Any:
@@ -131,11 +156,65 @@ class Model(object):
         merged = tf.concat([s_overview_l1, s_piece_pos_l1, s_atk_map_l1], axis=1)
         return merged  # shape [None, 416]
 
-    def predict(self, state: Any):
-        return 0
+    def learn(self, experiences: Any):
+        s_overview, s_legal_action, s_piece_pos, s_atk_map, action, ns_overview, ns_legal_action, ns_piece_pos, ns_atk_map, reward = zip(*experiences)
+        s_overview = np.asarray(s_overview)
+        s_legal_action = np.asarray(s_legal_action)
+        s_piece_pos = np.asarray(s_piece_pos)
+        s_atk_map = np.asarray(s_atk_map)
+        action = np.asarray(action)
+        ns_overview = np.asarray(ns_overview)
+        ns_legal_action = np.asarray(ns_legal_action)
+        ns_piece_pos = np.asarray(ns_piece_pos)
+        ns_atk_map = np.asarray(ns_atk_map)
+        reward = np.asarray(reward)
+        v_next = self.sess.run(self.c_v, feed_dict={
+            self.next_state_overview: ns_overview,
+            self.next_state_legal_actions: ns_legal_action,
+            self.next_state_piece_positions: ns_piece_pos,
+            self.next_state_attack_map: ns_atk_map,
+        })
+        ns_merged = self.sess.run(self.a_s_merged, feed_dict={
+            self.next_state_overview: ns_overview,
+            self.next_state_legal_actions: ns_legal_action,
+            self.next_state_piece_positions: ns_piece_pos,
+            self.next_state_attack_map: ns_atk_map,
+        })
+        int_reward = self.sess.run(self.int_reward, feed_dict={
+            self.state_overview: s_overview,
+            self.state_legal_actions: s_legal_action,
+            self.state_piece_positions: s_piece_pos,
+            self.state_attack_map: s_atk_map,
+            self.action: action,
+            self.a_ns_merged: ns_merged
+        })
+        total_reward = np.add(reward, int_reward)
+        advantage = self.sess.run(self.c_adv, feed_dict={
+            self.state_overview: s_overview,
+            self.state_legal_actions: s_legal_action,
+            self.state_piece_positions: s_piece_pos,
+            self.state_attack_map: s_atk_map,
+            self.total_reward: total_reward,
+            self.v_next: v_next
+        })
+        feed_dict = {
+            self.state_overview: s_overview,
+            self.state_legal_actions: s_legal_action,
+            self.state_piece_positions: s_piece_pos,
+            self.state_attack_map: s_atk_map,
+            self.action: action,
+            self.advantage: advantage,
+            self.a_ns_merged: ns_merged
+        }
+        [self.sess.run(self.actor_optimizer, feed_dict=feed_dict) for _ in range(self.config.N_UPDATE)]
+        [self.sess.run(self.critic_optimizer, feed_dict=feed_dict) for _ in range(self.config.N_UPDATE)]
+        [self.sess.run(self.curiosity_optimizer, feed_dict=feed_dict) for _ in range(self.config.N_UPDATE)]
 
-    def play(self, state: Any):
-        return 0
+    def act(self, state: Any, play: bool = False):
+        if play is False:
+            pass
+        else:
+            pass
 
     def save(self, path: str = './df_model/model.ckpt'):
         save_path = self.saver.save(self.sess, path)
