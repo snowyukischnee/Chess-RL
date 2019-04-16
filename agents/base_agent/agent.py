@@ -8,7 +8,7 @@ from CP_CHESS.agents.base_agent.config import BaseConfig
 
 class BaseAgent(object):
     def __init__(self, config: BaseConfig) -> None:
-        self.config = config
+        pass
 
     def action(self, state_type: str, state: Any, play: bool = False) -> Any:
         pass

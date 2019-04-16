@@ -220,13 +220,14 @@ class Model(object):
         })
         action = np.squeeze(action, axis=0)
         if play is False:
-            return np.random.choice(action.shape[0], 1, p=action)
+            return int(np.random.choice(action.shape[0], 1, p=action)[0])
         else:
-            return np.argmax(action)
+            return int(np.argmax(action))
 
-    def save(self, path: str = './df_model/model.ckpt') -> None:
+    def save(self, path: str = './df_model/model.ckpt') -> str:
         save_path = self.saver.save(self.sess, path)
-        print('model saved at {}'.format(save_path))
+        return save_path
+        # print('model saved at {}'.format(save_path))
 
     def load(self, path: str = './df_model/model.ckpt') -> None:
         self.saver.restore(self.sess, path)

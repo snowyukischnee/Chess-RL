@@ -14,6 +14,10 @@ class Board2State(object):
     def eval(self) -> Any:
         pass
 
+    @staticmethod
+    def static_eval(board: chess.Board, actions: list) -> Any:
+        pass
+
 
 class Board2State0(Board2State):
     def __init__(self, board: chess.Board, actions: list) -> None:

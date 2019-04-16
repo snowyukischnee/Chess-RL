@@ -5,7 +5,8 @@ import chess
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../')))
-from CP_CHESS.utils.board2state import Board2State0 as board2state
+from CP_CHESS.utils.board2state import Board2State
+from CP_CHESS.utils.board2state import Board2State0 as board2state0
 
 
 class ChessEnv(object):
@@ -69,7 +70,7 @@ class ChessEnv(object):
         else:
             return None
 
-    def reset(self, fen: str = None, board2state: Any = None) -> Any:
+    def reset(self, fen: str = None, board2state: Board2State = None) -> Any:
         """Reset the game
         :param
             fen(str): the initial configuration for the board. None for default setting
@@ -82,12 +83,10 @@ class ChessEnv(object):
             self.board = chess.Board()
         _next_state = None
         if board2state is not None:
-            _next_state_bs = board2state(self.board, self.actions)
-            _next_state = _next_state_bs.eval()
-            del _next_state_bs
+            _next_state = board2state.static_eval(self.board, self.actions)
         return board2state.__name__, _next_state
 
-    def step(self, action: int, board2state: Any = None) -> Any:
+    def step(self, action: int, board2state: Board2State = None) -> Any:
         """Make an action in the environment
         :param
             action(int): choose the action
@@ -120,9 +119,7 @@ class ChessEnv(object):
                 _reward = 0
         _next_state = None
         if board2state is not None:
-            _next_state_bs = board2state(self.board, self.actions)
-            _next_state = _next_state_bs.eval()
-            del _next_state_bs
+            _next_state = board2state.static_eval(self.board, self.actions)
         return board2state.__name__, _next_state, _reward, self.done, None
 
 
@@ -130,8 +127,9 @@ if __name__ == '__main__':
     """For testing purpose only
     """
     game = ChessEnv()
-    tp, a = game.reset(fen=None, board2state=board2state)
-    tp, a, b, c, d = game.step(928, board2state=board2state)
+    tp, a = game.reset(fen=None, board2state=board2state0)
+    tp, a, b, c, d = game.step(928, board2state=board2state0)
+    print(tp)
     # game.board.push_uci('e2e4')
     print(game.board.is_check())
     print(game.board.was_into_check())

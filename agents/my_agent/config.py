@@ -7,6 +7,7 @@ from CP_CHESS.agents.base_agent.config import BaseConfig
 
 class Config(BaseConfig):
     def __init__(self):
+        super().__init__()
         self.N_UPDATE = 10
         self.GAMMA = 0.95
         self.a_lr = 1e-4
