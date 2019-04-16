@@ -53,8 +53,8 @@ class Model(object):
         # utility
         self.saver = tf.train.Saver()
         self.sess = tf.Session()
+        self.sess.run(tf.initializers.global_variables())
         # test
-        # self.sess.run(tf.initializers.global_variables())
         # ns_mg = self.sess.run(self.a_s_merged, feed_dict={
         #     self.state_overview: np.zeros((2, 17)),
         #     self.state_legal_actions: np.ones((2, self.config.n_action)),
@@ -143,7 +143,7 @@ class Model(object):
             return [t.assign(o) for o, t in zip(origin, target)]
 
     @staticmethod
-    def feature_extraction(s_overview: Any, s_piece_pos: Any, s_atk_map: Any):
+    def feature_extraction(s_overview: Any, s_piece_pos: Any, s_atk_map: Any) -> Any:
         # s_overview
         s_overview_l1 = tf.layers.Dense(units=32, activation=tf.nn.relu)(s_overview)
         # s_piece_pos
@@ -156,7 +156,7 @@ class Model(object):
         merged = tf.concat([s_overview_l1, s_piece_pos_l1, s_atk_map_l1], axis=1)
         return merged  # shape [None, 416]
 
-    def learn(self, experiences: Any):
+    def learn(self, experiences: Any) -> None:
         s_overview, s_legal_action, s_piece_pos, s_atk_map, action, ns_overview, ns_legal_action, ns_piece_pos, ns_atk_map, reward = zip(*experiences)
         s_overview = np.asarray(s_overview)
         s_legal_action = np.asarray(s_legal_action)
@@ -210,15 +210,23 @@ class Model(object):
         [self.sess.run(self.critic_optimizer, feed_dict=feed_dict) for _ in range(self.config.N_UPDATE)]
         [self.sess.run(self.curiosity_optimizer, feed_dict=feed_dict) for _ in range(self.config.N_UPDATE)]
 
-    def act(self, state: Any, play: bool = False):
+    def act(self, state: Any, play: bool = False) -> int:
+        s_overview, s_legal_action, s_piece_pos, s_atk_map = state  # not zip
+        action = self.sess.run(self.a_dist, feed_dict={
+            self.state_overview: np.expand_dims(s_overview, axis=0),
+            self.state_legal_actions: np.expand_dims(s_legal_action, axis=0),
+            self.state_piece_positions: np.expand_dims(s_piece_pos, axis=0),
+            self.state_attack_map: np.expand_dims(s_atk_map, axis=0),
+        })
+        action = np.squeeze(action, axis=0)
         if play is False:
-            pass
+            return np.random.choice(action.shape[0], 1, p=action)
         else:
-            pass
+            return np.argmax(action)
 
-    def save(self, path: str = './df_model/model.ckpt'):
+    def save(self, path: str = './df_model/model.ckpt') -> None:
         save_path = self.saver.save(self.sess, path)
         print('model saved at {}'.format(save_path))
 
-    def load(self, path: str = './df_model/model.ckpt'):
+    def load(self, path: str = './df_model/model.ckpt') -> None:
         self.saver.restore(self.sess, path)

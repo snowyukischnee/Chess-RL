@@ -3,13 +3,14 @@ from typing import Any
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../../')))
+from CP_CHESS.agents.base_agent.agent import BaseAgent
 from CP_CHESS.env.environment import ChessEnv
 from CP_CHESS.utils.board2state import Board2State0 as board2state
 from CP_CHESS.agents.my_agent.config import Config
 from CP_CHESS.agents.my_agent.model import Model
 
 
-class Agent(object):
+class Agent(BaseAgent):
     def __init__(self, config: Config):
         self.model = Model(config)
 
@@ -29,4 +30,4 @@ if __name__ == '__main__':
     config = Config()
     config.n_action = len(game.actions)
     ag = Agent(config)
-    ag.action(tp, a)
+    x = ag.action(tp, a)
