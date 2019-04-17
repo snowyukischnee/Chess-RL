@@ -2,6 +2,7 @@ from typing import Any
 import numpy as np
 import chess
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 
 import sys
 import os
@@ -9,66 +10,76 @@ sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../
 from CP_CHESS.agents.my_agent.config import Config
 
 
+def get_available_devices():
+    local_devices = device_lib.list_local_devices()
+    return [device.name for device in local_devices if device.device_type == 'GPU']
+
+
 class Model(object):
     def __init__(self, config: Config):
         self.config = config
         # state
-        self.state_overview = tf.placeholder(tf.float32, [None, 17], 'state_overview')
-        self.state_legal_actions = tf.placeholder(tf.float32, [None, self.config.n_action], 'state_legal_actions')
-        self.state_piece_positions = tf.placeholder(tf.float32, [None, 12, 64], 'state_piece_positions')
-        self.state_attack_map = tf.placeholder(tf.float32, [None, 128, 64], 'state_attack_map')
-        # action
-        self.action = tf.placeholder(tf.float32, [None, self.config.n_action], 'action')
-        # next_state
-        self.next_state_overview = tf.placeholder(tf.float32, [None, 17], 'next_state_overview')
-        self.next_state_legal_actions = tf.placeholder(tf.float32, [None, self.config.n_action], 'next_state_legal_actions')
-        self.next_state_piece_positions = tf.placeholder(tf.float32, [None, 12, 64], 'next_state_piece_positions')
-        self.next_state_attack_map = tf.placeholder(tf.float32, [None, 128, 64], 'next_state_attack_map')
-        # external reward
-        self.reward = tf.placeholder(tf.float32, [None, 1], 'reward_ext')
+        local_gpus = get_available_devices()
+        device_name = '/gpu:0'
+        if len(local_gpus) == 0:
+            device_name = '/cpu:0'
+        with tf.device(device_name):
+            self.state_overview = tf.placeholder(tf.float32, [None, 17], 'state_overview')
+            self.state_legal_actions = tf.placeholder(tf.float32, [None, self.config.n_action], 'state_legal_actions')
+            self.state_piece_positions = tf.placeholder(tf.float32, [None, 12, 64], 'state_piece_positions')
+            self.state_attack_map = tf.placeholder(tf.float32, [None, 128, 64], 'state_attack_map')
+            # action
+            self.action = tf.placeholder(tf.float32, [None, self.config.n_action], 'action')
+            # next_state
+            self.next_state_overview = tf.placeholder(tf.float32, [None, 17], 'next_state_overview')
+            self.next_state_legal_actions = tf.placeholder(tf.float32, [None, self.config.n_action], 'next_state_legal_actions')
+            self.next_state_piece_positions = tf.placeholder(tf.float32, [None, 12, 64], 'next_state_piece_positions')
+            self.next_state_attack_map = tf.placeholder(tf.float32, [None, 128, 64], 'next_state_attack_map')
+            # external reward
+            self.reward = tf.placeholder(tf.float32, [None, 1], 'reward_ext')
 
-        self.v_next = tf.placeholder(tf.float32, [None, 1], 'v_next')
-        self.advantage = tf.placeholder(tf.float32, [None, 1], 'advantage')
-        self.total_reward = tf.placeholder(tf.float32, [None, 1], 'total_reward')
-        # Feature extraction block
-        self.a_s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
-        self.s_merged_shape = 416
-        self.a_ns_merged = tf.placeholder(tf.float32, [None, self.s_merged_shape], 'ns_merged')
-        # Curiosity block
-        self.curious_params, self.curious_out, self.int_reward = self.build_curiosity_net(self.a_s_merged, self.action, self.a_ns_merged, self.s_merged_shape, '', 'dyn_net')
-        self.clipped_int_reward = tf.clip_by_value(self.int_reward, 0, 1)  # experiment
-        self.cr_obj_f = tf.reduce_mean(self.int_reward)
-        self.curiosity_optimizer = tf.train.RMSPropOptimizer(self.config.cs_lr).minimize(self.cr_obj_f, var_list=self.curious_params)
-        # Actor block
-        self.a_params, self.a_dist = self.build_actor_net(self.a_s_merged, self.state_legal_actions, self.config.n_action, '', 'pi')
-        self.a_log_prob = tf.log(tf.reduce_sum(self.action * self.a_dist))
-        self.a_obj_f = tf.reduce_mean(self.a_log_prob * self.advantage)
-        self.actor_optimizer = tf.train.RMSPropOptimizer(self.config.a_lr).minimize(-self.a_obj_f)
-        # Critic block
-        self.c_s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
-        self.c_params, self.c_v = self.build_critic_net(self.c_s_merged, '', 'critic')
-        self.c_adv = self.total_reward + self.config.GAMMA * self.v_next - self.c_v
-        self.c_obj_f = tf.reduce_mean(tf.square(self.c_adv))
-        self.critic_optimizer = tf.train.RMSPropOptimizer(self.config.c_lr).minimize(self.cr_obj_f)
-        # utility
-        self.saver = tf.train.Saver()
-        self.sess = tf.Session()
-        self.sess.run(tf.initializers.global_variables())
-        # test
-        # ns_mg = self.sess.run(self.a_s_merged, feed_dict={
-        #     self.state_overview: np.zeros((2, 17)),
-        #     self.state_legal_actions: np.ones((2, self.config.n_action)),
-        #     self.state_piece_positions: np.zeros((2, 12, 64)),
-        #     self.state_attack_map: np.ones((2, 128, 64)),
-        # })
-        # print(self.sess.run(self.int_reward, feed_dict={
-        #     self.state_overview: np.zeros((2, 17)),
-        #     self.state_legal_actions: np.ones((2, self.config.n_action)),
-        #     self.state_piece_positions: np.zeros((2, 12, 64)),
-        #     self.state_attack_map: np.ones((2, 128, 64)),
-        #     self.action: np.zeros((2, self.config.n_action)),
-        #     self.a_ns_merged: ns_mg,
-        # }))
+            self.v_next = tf.placeholder(tf.float32, [None, 1], 'v_next')
+            self.advantage = tf.placeholder(tf.float32, [None, 1], 'advantage')
+            self.total_reward = tf.placeholder(tf.float32, [None, 1], 'total_reward')
+            # Feature extraction block
+            self.a_s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
+            self.s_merged_shape = 416
+            self.a_ns_merged = tf.placeholder(tf.float32, [None, self.s_merged_shape], 'ns_merged')
+            # Curiosity block
+            self.curious_params, self.curious_out, self.int_reward = self.build_curiosity_net(self.a_s_merged, self.action, self.a_ns_merged, self.s_merged_shape, '', 'dyn_net')
+            self.clipped_int_reward = tf.clip_by_value(self.int_reward, 0, 1)  # experiment
+            self.cr_obj_f = tf.reduce_mean(self.int_reward)
+            self.curiosity_optimizer = tf.train.RMSPropOptimizer(self.config.cs_lr).minimize(self.cr_obj_f, var_list=self.curious_params)
+            # Actor block
+            self.a_params, self.a_dist = self.build_actor_net(self.a_s_merged, self.state_legal_actions, self.config.n_action, '', 'pi')
+            self.a_log_prob = tf.log(tf.reduce_sum(self.action * self.a_dist))
+            self.a_obj_f = tf.reduce_mean(self.a_log_prob * self.advantage)
+            self.actor_optimizer = tf.train.RMSPropOptimizer(self.config.a_lr).minimize(-self.a_obj_f)
+            # Critic block
+            self.c_s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
+            self.c_params, self.c_v = self.build_critic_net(self.c_s_merged, '', 'critic')
+            self.c_adv = self.total_reward + self.config.GAMMA * self.v_next - self.c_v
+            self.c_obj_f = tf.reduce_mean(tf.square(self.c_adv))
+            self.critic_optimizer = tf.train.RMSPropOptimizer(self.config.c_lr).minimize(self.cr_obj_f)
+            # utility
+            self.saver = tf.train.Saver()
+            self.sess = tf.Session()
+            self.sess.run(tf.initializers.global_variables())
+            # test
+            # ns_mg = self.sess.run(self.a_s_merged, feed_dict={
+            #     self.state_overview: np.zeros((2, 17)),
+            #     self.state_legal_actions: np.ones((2, self.config.n_action)),
+            #     self.state_piece_positions: np.zeros((2, 12, 64)),
+            #     self.state_attack_map: np.ones((2, 128, 64)),
+            # })
+            # print(self.sess.run(self.int_reward, feed_dict={
+            #     self.state_overview: np.zeros((2, 17)),
+            #     self.state_legal_actions: np.ones((2, self.config.n_action)),
+            #     self.state_piece_positions: np.zeros((2, 12, 64)),
+            #     self.state_attack_map: np.ones((2, 128, 64)),
+            #     self.action: np.zeros((2, self.config.n_action)),
+            #     self.a_ns_merged: ns_mg,
+            # }))
 
     @staticmethod
     def build_curiosity_net(s_tensor: Any, a_tensor: Any, ns_tensor: Any, ns_shape: int, outer_scope: str, name: str, trainable: bool = True) -> Any:

@@ -12,3 +12,9 @@ class BaseAgent(object):
 
     def action(self, state_type: str, state: Any, play: bool = False) -> Any:
         pass
+
+    def save_model(self):
+        pass
+
+    def load_model(self, model_dir: str, model_ver: int):
+        pass
