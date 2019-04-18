@@ -20,20 +20,24 @@ class Agent(BaseAgent):
     def action(self, state_type: str, state: Any, play: bool = False) -> int:
         _action = 0
         _action = self.model.act(state, play=play)
-        print(state[0].shape, state[1].shape, state[2].shape, state[3].shape)
+        # print(state[0].shape, state[1].shape, state[2].shape, state[3].shape)
         return _action
 
-    def save_model_replace(self):
-        self.model.save('{}/model{}.ckpt'.format(self.model_dir, self.model_ver))
+    def save_model_replace(self) -> str:
+        return self.model.save('{}/model{}/model.ckpt'.format(self.model_dir, self.model_ver))
 
-    def save_model(self):
+    def save_model(self) -> str:
         self.model_ver += 1
-        self.model.save('{}/model{}.ckpt'.format(self.model_dir, self.model_ver))
+        return self.model.save('{}/model{}/model.ckpt'.format(self.model_dir, self.model_ver))
 
     def load_model(self, model_dir: str, model_ver: int):
-        self.model.load('{}/model{}/model.ckpt'.format(model_dir, model_ver))
-        self.model_dir = model_dir
-        self.model_ver = model_ver
+        try:
+            self.model.load('{}/model{}/model.ckpt'.format(model_dir, model_ver))
+            self.model_dir = model_dir
+            self.model_ver = model_ver
+        except:
+            self.model_ver = -1
+            self.save_model()
 
 
 if __name__ == '__main__':
