@@ -16,7 +16,7 @@ def get_available_devices():
 
 
 class Model(object):
-    def __init__(self, config: Config):
+    def __init__(self, config: Config) -> None:
         self.config = config
         # state
         local_gpus = get_available_devices()

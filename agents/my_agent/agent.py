@@ -11,7 +11,7 @@ from CP_CHESS.agents.my_agent.model import Model
 
 
 class Agent(BaseAgent):
-    def __init__(self, config: Config):
+    def __init__(self, config: Config) -> None:
         super().__init__(config)
         self.model = Model(config)
         self.model_dir = './model'
@@ -30,7 +30,7 @@ class Agent(BaseAgent):
         self.model_ver += 1
         return self.model.save('{}/model{}/model.ckpt'.format(self.model_dir, self.model_ver))
 
-    def load_model(self, model_dir: str, model_ver: int):
+    def load_model(self, model_dir: str, model_ver: int) -> None:
         try:
             self.model.load('{}/model{}/model.ckpt'.format(model_dir, model_ver))
             self.model_dir = model_dir

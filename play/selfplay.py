@@ -15,29 +15,34 @@ from CP_CHESS.agents.my_agent.agent import Agent
 
 
 class SelfPlayConfig(object):
-    def __init__(self):
+    def __init__(self) -> None:
         self.n_episodes = 50
-        self.max_steps = 277  # the largest number of moves in a game of chess in record
+        self.max_steps = 100
         self.model_dir = './model'
         self.model_ver = 0
 
 
 class SelfPlay(object):
-    def __init__(self, config: SelfPlayConfig):
+    def __init__(self, config: SelfPlayConfig) -> None:
         self.config = config
         self.current_player = None
         self.target_player = None
         self.env = None
         self.memory = Memory(self.config.max_steps)
 
-    def init(self, config: BaseConfig, agent: BaseAgent):
+    def init(self, config: BaseConfig, agent: BaseAgent) -> None:
         self.env = ChessEnv()
         config.n_action = len(self.env.actions)
         self.current_player = agent(config)
         self.target_player = agent(config)
         self.memory.clear()
 
-    def process(self, opponent_is_white: bool = False):
+    def resume(self, model_dir: str, model_ver: int) -> None:
+        self.config.model_dir = model_dir
+        self.config.model_ver = model_ver
+        self.current_player.load_model(self.config.model_dir, self.config.model_ver)
+
+    def process(self, opponent_is_white: bool = False) -> None:
         actions = np.identity(len(self.env.actions))
         self.target_player.load_model(self.config.model_dir, self.config.model_ver)
         if opponent_is_white is True:
