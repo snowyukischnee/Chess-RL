@@ -7,6 +7,8 @@ import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../../')))
 from CP_CHESS.agents.a2c_agent.config import Config
+# for debugging
+np.set_printoptions(threshold=sys.maxsize)
 
 
 class Model(object):
@@ -46,8 +48,8 @@ class Model(object):
                 self.critic_optimizer = tf.train.AdamOptimizer(self.config.c_lr).minimize(self.c_obj_f)
                 # utility
                 self.sess = tf.Session()
-            with tf.device('/cpu:0'):
                 self.sess.run(tf.initializers.global_variables())
+            with tf.device('/cpu:0'):
                 self.saver = tf.train.Saver()
 
     @staticmethod
@@ -60,13 +62,20 @@ class Model(object):
             l1 = tf.layers.Dense(
                 units=512,
                 activation=tf.nn.relu,
+                kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                bias_initializer=tf.constant_initializer(0.1),
                 trainable=trainable,
             )(input_tensor)
             action_distribution = tf.layers.Dense(
                 units=n_action,
-                activation=tf.nn.softmax,
+                activation=tf.nn.relu,
+                kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                bias_initializer=tf.constant_initializer(0.1),
                 trainable=trainable,
             )(l1)
+            action_distribution = action_distribution * legal_action
+            action_distribution_sum = tf.expand_dims(tf.reduce_sum(action_distribution, axis=1), axis=-1) * np.ones((1, n_action), dtype=np.float32)
+            action_distribution = action_distribution / action_distribution_sum
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=full_path)
         return params, action_distribution
 
@@ -80,11 +89,15 @@ class Model(object):
             l1 = tf.layers.Dense(
                 units=512,
                 activation=tf.nn.relu,
+                kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                bias_initializer=tf.constant_initializer(0.1),
                 trainable=trainable,
             )(input_tensor)
             v = tf.layers.Dense(
                 units=1,
                 activation=tf.nn.relu,
+                kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                bias_initializer=tf.constant_initializer(0.1),
                 trainable=trainable,
             )(l1)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=full_path)
@@ -100,13 +113,28 @@ class Model(object):
     @staticmethod
     def feature_extraction(s_overview: Any, s_piece_pos: Any, s_atk_map: Any) -> Any:
         # s_overview
-        s_overview_l1 = tf.layers.Dense(units=32, activation=tf.nn.relu)(s_overview)
+        s_overview_l1 = tf.layers.Dense(
+            units=32,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.constant_initializer(0.1),
+        )(s_overview)
         # s_piece_pos
         s_piece_pos_f = tf.layers.Flatten()(s_piece_pos)
-        s_piece_pos_l1 = tf.layers.Dense(units=128, activation=tf.nn.relu)(s_piece_pos_f)
+        s_piece_pos_l1 = tf.layers.Dense(
+            units=128,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.constant_initializer(0.1),
+        )(s_piece_pos_f)
         # s_atk_map
         s_atk_map_f = tf.layers.Flatten()(s_atk_map)
-        s_atk_map_l1 = tf.layers.Dense(units=256, activation=tf.nn.relu)(s_atk_map_f)
+        s_atk_map_l1 = tf.layers.Dense(
+            units=256,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.constant_initializer(0.1),
+        )(s_atk_map_f)
         # merged
         merged = tf.concat([s_overview_l1, s_piece_pos_l1, s_atk_map_l1], axis=1)
         return merged  # shape [None, 416]
@@ -171,7 +199,7 @@ class Model(object):
         action[s_legal_action == 0] = np.NINF
         # debug
         # print('X = ', action)
-        # print('X = ', action[action != np.NINF])
+        print('X = ', action[action != np.NINF])
         action = action - action.max(axis=0, keepdims=True)
         action = np.exp(action)
         action = action / action.sum(axis=0, keepdims=True)

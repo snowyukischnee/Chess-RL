@@ -14,9 +14,9 @@ from CP_CHESS.agents.a2c_agent.agent import Agent
 
 class SelfPlayConfig(object):
     def __init__(self) -> None:
-        self.n_episodes = 100
+        self.n_episodes = 1
         self.update_interval = 32
-        self.max_steps = 32 * 10
+        self.max_steps = 32
         self.model_dir = './model'
         self.model_ver = 0
 
@@ -63,6 +63,8 @@ class SelfPlay(object):
                     action = self.current_player.action(state_type, state)
                     state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
                     self.memory.add((state, actions[action], next_state, reward))
+                    # debug
+                    print('state: {}, action: {}, reward: {}'.format(self.env.board.fen(), self.env.actions[action], reward))
                     state = next_state
                     if done or interval_clock > self.config.update_interval or timestep > self.config.max_steps:
                         interval_clock = 0
@@ -82,7 +84,8 @@ class SelfPlay(object):
                     action = self.current_player.action(state_type, state)
                     state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
                     self.memory.add((state, actions[action], next_state, reward))
-                    # print('state: {}, action: {}, reward: {}'.format(self.env.board.fen(), self.env.actions[action], reward))
+                    # debug
+                    print('state: {}, action: {}, reward: {}'.format(self.env.board.fen(), self.env.actions[action], reward))
                     state = next_state
                     if done or interval_clock > self.config.update_interval or timestep > self.config.max_steps:
                         interval_clock = 0
