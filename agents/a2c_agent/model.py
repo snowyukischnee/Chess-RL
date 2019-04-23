@@ -9,15 +9,6 @@ sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../
 from CP_CHESS.agents.a2c_agent.config import Config
 
 
-def softmax(x, axis=None):
-    # debug
-    # print('X1 = ', x)
-    # print('X1 = ', x[x != np.NINF])
-    x = x - x.max(axis=axis, keepdims=True)
-    y = np.exp(x)
-    return y / y.sum(axis=axis, keepdims=True)
-
-
 class Model(object):
     def __init__(self, config: Config, gpu_idx: int = None) -> None:
         self.config = config
@@ -181,7 +172,9 @@ class Model(object):
         # debug
         # print('X = ', action)
         # print('X = ', action[action != np.NINF])
-        action = softmax(action, axis=0)
+        action = action - action.max(axis=0, keepdims=True)
+        action = np.exp(action)
+        action = action / action.sum(axis=0, keepdims=True)
         if play is False:
             # from CP_CHESS.env.environment import ChessEnv
             # actions = ChessEnv.init_actions()
