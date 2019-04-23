@@ -68,11 +68,12 @@ class Model(object):
             )(input_tensor)
             action_distribution = tf.layers.Dense(
                 units=n_action,
-                activation=tf.nn.relu,
+                activation=tf.nn.tanh,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.constant_initializer(0.1),
                 trainable=trainable,
             )(l1)
+            action_distribution = tf.math.softplus(action_distribution)
             action_distribution = action_distribution * legal_action
             action_distribution_sum = tf.expand_dims(tf.reduce_sum(action_distribution, axis=1), axis=-1) * np.ones((1, n_action), dtype=np.float32)
             action_distribution = action_distribution / action_distribution_sum
@@ -196,13 +197,10 @@ class Model(object):
             self.state_attack_map: np.expand_dims(s_atk_map, axis=0),
         })
         action = np.squeeze(action, axis=0)
-        action[s_legal_action == 0] = np.NINF
-        # debug
-        # print('X = ', action)
-        print('X = ', action[action != np.NINF])
-        action = action - action.max(axis=0, keepdims=True)
-        action = np.exp(action)
-        action = action / action.sum(axis=0, keepdims=True)
+        print('X = ', action[action != 0], action.sum(axis=0), np.count_nonzero(s_legal_action == 1))
+        # print('Y = ', x1)
+        # print('Z = ', x2)
+        # print('X1 = ', action.sum())
         if play is False:
             # from CP_CHESS.env.environment import ChessEnv
             # actions = ChessEnv.init_actions()

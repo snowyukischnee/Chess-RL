@@ -42,7 +42,7 @@ if __name__ == '__main__':
             print('model version {} will be loaded'.format(args.model_version))
         for v in range(args.n_episodes):
             fl = not getrandbits(1)
-            sp.process(opponent_is_white=False)
+            sp.process(opponent_is_white=fl)
     elif args.play:
         playwbot = PlayWBot(PlayConfig())
         playwbot.init(Config(), Agent)

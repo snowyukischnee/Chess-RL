@@ -14,9 +14,9 @@ from CP_CHESS.agents.a2c_agent.agent import Agent
 
 class SelfPlayConfig(object):
     def __init__(self) -> None:
-        self.n_episodes = 1
+        self.n_episodes = 10
         self.update_interval = 32
-        self.max_steps = 32
+        self.max_steps = 32 * 20
         self.model_dir = './model'
         self.model_ver = 0
 
@@ -49,23 +49,32 @@ class SelfPlay(object):
                 self.memory.clear()
                 timestep = 0
                 interval_clock = 0
-                state_type, state = self.env.reset(fen=None, board2state=board2state)
+                # opponent play first
+                state_type, opponent_state = self.env.reset(fen=None, board2state=board2state)
+                opponent_action = self.target_player.action(state_type, opponent_state)
+                state_type, opponent_next_state, opponent_reward, done, info = self.env.step(opponent_action, board2state=board2state)
+                player_state = opponent_next_state
                 while True:
                     timestep += 1
                     interval_clock += 1
-                    # opponent's turn
-                    action = self.target_player.action(state_type, state)
-                    state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
-                    state = next_state
-                    if done or timestep > self.config.max_steps:
-                        break
                     # player's turn
-                    action = self.current_player.action(state_type, state)
-                    state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
-                    self.memory.add((state, actions[action], next_state, reward))
+                    player_action = self.current_player.action(state_type, player_state)
+                    state_type, player_next_state, player_reward, done, info = self.env.step(player_action, board2state=board2state)
+                    opponent_state = player_next_state
+                    if done:
+                        self.memory.add((player_state, actions[player_action], player_next_state, player_reward))
+                        interval_clock = 0
+                        self.current_player.model.learn(self.memory.sample(self.config.max_steps, continuous=True))
+                    if done:
+                        break
+                    # opponent's turn
+                    opponent_action = self.target_player.action(state_type, opponent_state)
+                    state_type, opponent_next_state, opponent_reward, done, info = self.env.step(opponent_action, board2state=board2state)
+                    reward = (player_reward - opponent_reward) / 2
+                    self.memory.add((player_state, actions[player_action], opponent_next_state, reward))
                     # debug
-                    print('state: {}, action: {}, reward: {}'.format(self.env.board.fen(), self.env.actions[action], reward))
-                    state = next_state
+                    print('state: {}, action: {}, reward: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], reward, done))
+                    player_state = opponent_next_state
                     if done or interval_clock > self.config.update_interval or timestep > self.config.max_steps:
                         interval_clock = 0
                         self.current_player.model.learn(self.memory.sample(self.config.max_steps, continuous=True))
@@ -76,26 +85,31 @@ class SelfPlay(object):
                 self.memory.clear()
                 timestep = 0
                 interval_clock = 0
-                state_type, state = self.env.reset(fen=None, board2state=board2state)
+                state_type, player_state = self.env.reset(fen=None, board2state=board2state)
                 while True:
                     timestep += 1
                     interval_clock += 1
                     # player's turn
-                    action = self.current_player.action(state_type, state)
-                    state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
-                    self.memory.add((state, actions[action], next_state, reward))
+                    player_action = self.current_player.action(state_type, player_state)
+                    state_type, player_next_state, player_reward, done, info = self.env.step(player_action, board2state=board2state)
+                    opponent_state = player_next_state
+                    if done:
+                        self.memory.add((player_state, actions[player_action], player_next_state, player_reward))
+                        interval_clock = 0
+                        self.current_player.model.learn(self.memory.sample(self.config.max_steps, continuous=True))
+                    if done:
+                        break
+                    # opponent's turn
+                    opponent_action = self.target_player.action(state_type, opponent_state)
+                    state_type, opponent_next_state, opponent_reward, done, info = self.env.step(opponent_action, board2state=board2state)
+                    reward = (player_reward - opponent_reward) / 2
+                    self.memory.add((player_state, actions[player_action], opponent_next_state, reward))
                     # debug
-                    print('state: {}, action: {}, reward: {}'.format(self.env.board.fen(), self.env.actions[action], reward))
-                    state = next_state
+                    print('state: {}, action: {}, reward: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], reward, done))
+                    player_state = opponent_next_state
                     if done or interval_clock > self.config.update_interval or timestep > self.config.max_steps:
                         interval_clock = 0
                         self.current_player.model.learn(self.memory.sample(self.config.max_steps, continuous=True))
-                    if done or timestep > self.config.max_steps:
-                        break
-                    # opponent's turn
-                    action = self.target_player.action(state_type, state)
-                    state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
-                    state = next_state
                     if done or timestep > self.config.max_steps:
                         break
         save_path = self.current_player.save_model()
