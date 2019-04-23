@@ -4,19 +4,8 @@ import chess
 
 import sys
 import os
-sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../')))
-
-
-class Board2State(object):
-    def __init__(self, board: chess.Board, actions: list) -> None:
-        pass
-
-    def eval(self) -> Any:
-        pass
-
-    @staticmethod
-    def static_eval(board: chess.Board, actions: list) -> Any:
-        pass
+sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../../')))
+from CP_CHESS.agents.base_agent.board2state import Board2State
 
 
 class Board2State0(Board2State):
@@ -53,7 +42,7 @@ class Board2State0(Board2State):
             numpy.ndarray(128,64): 2 attack map of white and black
         """
         super().__init__(board, actions)
-        self.board_overview = np.zeros(shape=17, dtype=np.int32)
+        self.board_overview = np.zeros(shape=17, dtype=np.float32)
         self.board_overview[0] = board.turn
         self.board_overview[1] = board.has_kingside_castling_rights(chess.WHITE)
         self.board_overview[2] = board.has_queenside_castling_rights(chess.WHITE)
@@ -71,11 +60,11 @@ class Board2State0(Board2State):
         self.board_overview[14] = len(board.pieces(chess.BISHOP, chess.BLACK))
         self.board_overview[15] = len(board.pieces(chess.QUEEN, chess.BLACK))
         self.board_overview[16] = len(board.pieces(chess.KING, chess.BLACK))
-        self.legal_actions = np.zeros(shape=len(actions), dtype=np.int32)
+        self.legal_actions = np.zeros(shape=len(actions), dtype=np.float32)
         for i in range(len(actions)):
             if chess.Move.from_uci(actions[i]) in board.legal_moves:
                 self.legal_actions[i] = 1
-        self.piece_positions = np.zeros(shape=(12, 64), dtype=np.int32)
+        self.piece_positions = np.zeros(shape=(12, 64), dtype=np.float32)
         self.piece_positions[0][list(board.pieces(chess.PAWN, chess.WHITE))] = 1
         self.piece_positions[1][list(board.pieces(chess.ROOK, chess.WHITE))] = 1
         self.piece_positions[2][list(board.pieces(chess.KNIGHT, chess.WHITE))] = 1
@@ -88,7 +77,7 @@ class Board2State0(Board2State):
         self.piece_positions[9][list(board.pieces(chess.BISHOP, chess.BLACK))] = 1
         self.piece_positions[10][list(board.pieces(chess.QUEEN, chess.BLACK))] = 1
         self.piece_positions[11][list(board.pieces(chess.KING, chess.BLACK))] = 1
-        self.attack_map = np.zeros(shape=(128, 64), dtype=np.int32)
+        self.attack_map = np.zeros(shape=(128, 64), dtype=np.float32)
         for i in range(0, 64):
             self.attack_map[i][list(board.attackers(chess.WHITE, i))] = 1
         for i in range(64, 128):
@@ -133,7 +122,7 @@ class Board2State0(Board2State):
                     numpy.ndarray(12,64): represent board,
                     numpy.ndarray(128,64): 2 attack map of white and black
                 """
-        board_overview = np.zeros(shape=17, dtype=np.int32)
+        board_overview = np.zeros(shape=17, dtype=np.float32)
         board_overview[0] = board.turn
         board_overview[1] = board.has_kingside_castling_rights(chess.WHITE)
         board_overview[2] = board.has_queenside_castling_rights(chess.WHITE)
@@ -151,11 +140,11 @@ class Board2State0(Board2State):
         board_overview[14] = len(board.pieces(chess.BISHOP, chess.BLACK))
         board_overview[15] = len(board.pieces(chess.QUEEN, chess.BLACK))
         board_overview[16] = len(board.pieces(chess.KING, chess.BLACK))
-        legal_actions = np.zeros(shape=len(actions), dtype=np.int32)
+        legal_actions = np.zeros(shape=len(actions), dtype=np.float32)
         for i in range(len(actions)):
             if chess.Move.from_uci(actions[i]) in board.legal_moves:
                 legal_actions[i] = 1
-        piece_positions = np.zeros(shape=(12, 64), dtype=np.int32)
+        piece_positions = np.zeros(shape=(12, 64), dtype=np.float32)
         piece_positions[0][list(board.pieces(chess.PAWN, chess.WHITE))] = 1
         piece_positions[1][list(board.pieces(chess.ROOK, chess.WHITE))] = 1
         piece_positions[2][list(board.pieces(chess.KNIGHT, chess.WHITE))] = 1
@@ -168,10 +157,22 @@ class Board2State0(Board2State):
         piece_positions[9][list(board.pieces(chess.BISHOP, chess.BLACK))] = 1
         piece_positions[10][list(board.pieces(chess.QUEEN, chess.BLACK))] = 1
         piece_positions[11][list(board.pieces(chess.KING, chess.BLACK))] = 1
-        attack_map = np.zeros(shape=(128, 64), dtype=np.int32)
+        attack_map = np.zeros(shape=(128, 64), dtype=np.float32)
         for i in range(0, 64):
             attack_map[i][list(board.attackers(chess.WHITE, i))] = 1
         for i in range(64, 128):
             attack_map[i][list(board.attackers(chess.BLACK, i - 64))] = 1
 
+        return board_overview, legal_actions, piece_positions, attack_map
+
+    @staticmethod
+    def null_state(board: chess.Board, actions: list) -> Any:
+        """ get the null state
+        :return: the null state (all number are 0)
+        """
+        board_overview = np.zeros(shape=17, dtype=np.float32)
+        board_overview[0] = board.turn
+        legal_actions = np.zeros(shape=len(actions), dtype=np.float32)
+        piece_positions = np.zeros(shape=(12, 64), dtype=np.float32)
+        attack_map = np.zeros(shape=(128, 64), dtype=np.float32)
         return board_overview, legal_actions, piece_positions, attack_map

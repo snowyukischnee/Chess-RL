@@ -3,14 +3,10 @@ import numpy as np
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../')))
-
 from CP_CHESS.agents.base_agent.agent import BaseAgent
 from CP_CHESS.agents.base_agent.config import BaseConfig
-
 from CP_CHESS.env.environment import ChessEnv
-from CP_CHESS.utils.board2state import Board2State0 as board2state
-from CP_CHESS.agents.my_agent.config import Config
-from CP_CHESS.agents.my_agent.agent import Agent
+from CP_CHESS.agents.a2c_agent.board2state import Board2State0 as board2state
 
 
 class PlayConfig(object):
@@ -36,7 +32,6 @@ class PlayWBot(object):
         self.bot.load_model(self.config.model_dir, self.config.model_ver)
 
     def play(self, player_is_white: bool = True) -> None:
-        actions = np.identity(len(self.env.actions))
         if player_is_white is True:
             state_type, state = self.env.reset(fen=None, board2state=board2state)
             print(self.env.board)  # print the board
@@ -44,12 +39,15 @@ class PlayWBot(object):
                 action_str = input('Your move:')  # read the console input of the move
                 if action_str == 'exit':
                     break
-                action = self.env.actions.index(action_str)
-                state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
-                state = next_state
+                elif action_str == 'pass':
+                    pass
+                else:
+                    action = self.env.actions.index(action_str)
+                    state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
+                    state = next_state
                 print(self.env.board)  # print the board
                 if done:
-                    print('Game over. Score: {}'.format(self.env.board.result(claim_draw=True)))
+                    print('Game over. Score: {}'.format(self.env.result))
                     break
                 action = self.bot.action(state_type, state)
                 print('Bot move {}'.format(self.env.actions[action]))
@@ -57,7 +55,7 @@ class PlayWBot(object):
                 state = next_state
                 print(self.env.board)  # print the board
                 if done:
-                    print('Game over. Score: {}'.format(self.env.board.result(claim_draw=True)))
+                    print('Game over. Score: {}'.format(self.env.result))
                     break
         else:
             state_type, state = self.env.reset(fen=None, board2state=board2state)
@@ -68,15 +66,18 @@ class PlayWBot(object):
                 state = next_state
                 print(self.env.board)  # print the board
                 if done:
-                    print('Game over. Score: {}'.format(self.env.board.result(claim_draw=True)))
+                    print('Game over. Score: {}'.format(self.env.result))
                     break
                 action_str = input('Your move:')  # read the console input of the move
                 if action_str == 'exit':
                     break
-                action = self.env.actions.index(action_str)
-                state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
-                state = next_state
+                elif action_str == 'pass':
+                    pass
+                else:
+                    action = self.env.actions.index(action_str)
+                    state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
+                    state = next_state
                 print(self.env.board)  # print the board
                 if done:
-                    print('Game over. Score: {}'.format(self.env.board.result(claim_draw=True)))
+                    print('Game over. Score: {}'.format(self.env.result))
                     break

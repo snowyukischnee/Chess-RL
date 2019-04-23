@@ -2,27 +2,26 @@ from typing import Any
 import numpy as np
 import chess
 import tensorflow as tf
-from tensorflow.python.client import device_lib
 
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../../')))
-from CP_CHESS.agents.my_agent.config import Config
+from CP_CHESS.agents.a2c_agent.config import Config
 
 
-def get_available_devices():
-    local_devices = device_lib.list_local_devices()
-    return [device.name for device in local_devices if device.device_type == 'GPU']
+def softmax(x, axis=None):
+    x = x - x.max(axis=axis, keepdims=True)
+    y = np.exp(x)
+    return y / y.sum(axis=axis, keepdims=True)
 
 
 class Model(object):
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, gpu_idx: int = None) -> None:
         self.config = config
-        # state
-        local_gpus = get_available_devices()
-        device_name = '/gpu:0'
-        if len(local_gpus) == 0:
+        if gpu_idx is None:
             device_name = '/cpu:0'
+        else:
+            device_name = '/gpu:{}'.format(gpu_idx)
         self.graph = tf.Graph()
         with self.graph.as_default():
             with tf.device(device_name):
@@ -32,64 +31,30 @@ class Model(object):
                 self.state_attack_map = tf.placeholder(tf.float32, [None, 128, 64], 'state_attack_map')
                 # action
                 self.action = tf.placeholder(tf.float32, [None, self.config.n_action], 'action')
-                # next_state
-                self.next_state_overview = tf.placeholder(tf.float32, [None, 17], 'next_state_overview')
-                self.next_state_legal_actions = tf.placeholder(tf.float32, [None, self.config.n_action], 'next_state_legal_actions')
-                self.next_state_piece_positions = tf.placeholder(tf.float32, [None, 12, 64], 'next_state_piece_positions')
-                self.next_state_attack_map = tf.placeholder(tf.float32, [None, 128, 64], 'next_state_attack_map')
-                # external reward
-                self.reward = tf.placeholder(tf.float32, [None, 1], 'reward_ext')
 
                 self.v_next = tf.placeholder(tf.float32, [None, 1], 'v_next')
                 self.advantage = tf.placeholder(tf.float32, [None, 1], 'advantage')
-                self.total_reward = tf.placeholder(tf.float32, [None, 1], 'total_reward')
+                self.reward = tf.placeholder(tf.float32, [None, 1], 'reward')
                 # Feature extraction block
                 self.a_s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
                 self.s_merged_shape = 416
                 self.a_ns_merged = tf.placeholder(tf.float32, [None, self.s_merged_shape], 'ns_merged')
-                # Curiosity block
-                self.curious_params, self.curious_out, self.int_reward = self.build_curiosity_net(self.a_s_merged, self.action, self.a_ns_merged, self.s_merged_shape, '', 'dyn_net')
-                self.clipped_int_reward = tf.clip_by_value(self.int_reward, 0, 1)  # experiment
-                self.cr_obj_f = tf.reduce_mean(self.int_reward)
-                self.curiosity_optimizer = tf.train.RMSPropOptimizer(self.config.cs_lr).minimize(self.cr_obj_f, var_list=self.curious_params)
                 # Actor block
                 self.a_params, self.a_dist = self.build_actor_net(self.a_s_merged, self.state_legal_actions, self.config.n_action, '', 'pi')
                 self.a_log_prob = tf.log(tf.reduce_sum(self.action * self.a_dist))
                 self.a_obj_f = tf.reduce_mean(self.a_log_prob * self.advantage)
-                self.actor_optimizer = tf.train.RMSPropOptimizer(self.config.a_lr).minimize(-self.a_obj_f)
+                self.actor_optimizer = tf.train.AdamOptimizer(self.config.a_lr).minimize(-self.a_obj_f)
                 # Critic block
                 self.c_s_merged = self.feature_extraction(self.state_overview, self.state_piece_positions, self.state_attack_map)
                 self.c_params, self.c_v = self.build_critic_net(self.c_s_merged, '', 'critic')
-                self.c_adv = self.total_reward + self.config.GAMMA * self.v_next - self.c_v
+                self.c_adv = self.reward + self.config.GAMMA * self.v_next - self.c_v
                 self.c_obj_f = tf.reduce_mean(tf.square(self.c_adv))
-                self.critic_optimizer = tf.train.RMSPropOptimizer(self.config.c_lr).minimize(self.cr_obj_f)
+                self.critic_optimizer = tf.train.AdamOptimizer(self.config.c_lr).minimize(self.c_obj_f)
                 # utility
-                self.saver = tf.train.Saver()
                 self.sess = tf.Session()
                 self.sess.run(tf.initializers.global_variables())
-
-    @staticmethod
-    def build_curiosity_net(s_tensor: Any, a_tensor: Any, ns_tensor: Any, ns_shape: int, outer_scope: str, name: str, trainable: bool = True) -> Any:
-        if outer_scope and outer_scope.strip():
-            full_path = outer_scope + '/' + name
-        else:
-            full_path = name
-        with tf.variable_scope(name):
-            concat_tensor = tf.concat([s_tensor, tf.cast(a_tensor, dtype=tf.float32)], axis=1)
-            l1 = tf.layers.Dense(
-                units=512,
-                activation=tf.nn.relu,
-                trainable=trainable,
-            )(concat_tensor)
-            ns_predictor = tf.layers.Dense(
-                units=ns_shape,
-                activation=tf.nn.relu,
-                trainable=trainable,
-                name='curiosity_output'
-            )(l1)
-            int_reward = tf.reduce_sum(tf.square(ns_tensor - ns_predictor), axis=1)
-        params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=full_path)
-        return params, ns_predictor, int_reward
+            with tf.device('/cpu:0'):
+                self.saver = tf.train.Saver()
 
     @staticmethod
     def build_actor_net(input_tensor: Any, legal_action: Any, n_action: int, outer_scope: str, name: str, trainable: bool = True) -> Any:
@@ -103,13 +68,11 @@ class Model(object):
                 activation=tf.nn.relu,
                 trainable=trainable,
             )(input_tensor)
-            l1 = tf.layers.Dense(
+            action_distribution = tf.layers.Dense(
                 units=n_action,
-                activation=tf.nn.relu,
+                activation=tf.nn.softmax,
                 trainable=trainable,
             )(l1)
-            l1_filtered = l1 * legal_action
-            action_distribution = tf.nn.softmax(l1_filtered, axis=1, name='action_distribution')
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=full_path)
         return params, action_distribution
 
@@ -158,7 +121,6 @@ class Model(object):
         state, action, next_state, reward = zip(*experiences)
         s_overview, s_legal_action, s_piece_pos, s_atk_map = zip(*state)
         ns_overview, ns_legal_action, ns_piece_pos, ns_atk_map = zip(*next_state)
-        # s_overview, s_legal_action, s_piece_pos, s_atk_map, action, ns_overview, ns_legal_action, ns_piece_pos, ns_atk_map, reward = zip(*experiences)
         s_overview = np.asarray(s_overview)
         s_legal_action = np.asarray(s_legal_action)
         s_piece_pos = np.asarray(s_piece_pos)
@@ -181,21 +143,12 @@ class Model(object):
             self.state_piece_positions: ns_piece_pos,
             self.state_attack_map: ns_atk_map,
         })
-        int_reward = self.sess.run(self.int_reward, feed_dict={
-            self.state_overview: s_overview,
-            self.state_legal_actions: s_legal_action,
-            self.state_piece_positions: s_piece_pos,
-            self.state_attack_map: s_atk_map,
-            self.action: action,
-            self.a_ns_merged: ns_merged
-        })
-        total_reward = np.add(reward, int_reward[:, np.newaxis])
         advantage = self.sess.run(self.c_adv, feed_dict={
             self.state_overview: s_overview,
             self.state_legal_actions: s_legal_action,
             self.state_piece_positions: s_piece_pos,
             self.state_attack_map: s_atk_map,
-            self.total_reward: total_reward,
+            self.reward: reward,
             self.v_next: v_next
         })
         feed_dict = {
@@ -205,11 +158,12 @@ class Model(object):
             self.state_attack_map: s_atk_map,
             self.action: action,
             self.advantage: advantage,
-            self.a_ns_merged: ns_merged
+            self.a_ns_merged: ns_merged,
+            self.v_next: v_next,
+            self.reward: reward,
         }
         [self.sess.run(self.actor_optimizer, feed_dict=feed_dict) for _ in range(self.config.N_UPDATE)]
         [self.sess.run(self.critic_optimizer, feed_dict=feed_dict) for _ in range(self.config.N_UPDATE)]
-        [self.sess.run(self.curiosity_optimizer, feed_dict=feed_dict) for _ in range(self.config.N_UPDATE)]
 
     def act(self, state: Any, play: bool = False) -> int:
         s_overview, s_legal_action, s_piece_pos, s_atk_map = state  # not zip
@@ -220,7 +174,20 @@ class Model(object):
             self.state_attack_map: np.expand_dims(s_atk_map, axis=0),
         })
         action = np.squeeze(action, axis=0)
+        action[s_legal_action == 0] = np.finfo(np.float32).min
+        action = softmax(action, axis=0)
         if play is False:
+            # from CP_CHESS.env.environment import ChessEnv
+            # actions = ChessEnv.init_actions()
+            # c = [s_legal_action == 1]
+            # print(np.array(actions)[c])
+            # print(s_overview[0] == chess.WHITE)
+            # import matplotlib.pyplot as plt
+            # plt.plot(action)
+            # DIR = './image'
+            # index = len([name for name in os.listdir(DIR) if os.path.isfile(os.path.join(DIR, name))])
+            # plt.savefig('./image/a{}.png'.format(index))
+            # plt.clf()
             return int(np.random.choice(action.shape[0], 1, p=action)[0])
         else:
             return int(np.argmax(action))
@@ -228,7 +195,6 @@ class Model(object):
     def save(self, path: str = './df_model/model.ckpt') -> str:
         save_path = self.saver.save(self.sess, path)
         return save_path
-        # print('model saved at {}'.format(save_path))
 
     def load(self, path: str = './df_model/model.ckpt') -> None:
         self.saver.restore(self.sess, path)
