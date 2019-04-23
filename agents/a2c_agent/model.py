@@ -10,6 +10,9 @@ from CP_CHESS.agents.a2c_agent.config import Config
 
 
 def softmax(x, axis=None):
+    # debug
+    # print('X1 = ', x)
+    # print('X1 = ', x[x != np.NINF])
     x = x - x.max(axis=axis, keepdims=True)
     y = np.exp(x)
     return y / y.sum(axis=axis, keepdims=True)
@@ -52,8 +55,8 @@ class Model(object):
                 self.critic_optimizer = tf.train.AdamOptimizer(self.config.c_lr).minimize(self.c_obj_f)
                 # utility
                 self.sess = tf.Session()
-                self.sess.run(tf.initializers.global_variables())
             with tf.device('/cpu:0'):
+                self.sess.run(tf.initializers.global_variables())
                 self.saver = tf.train.Saver()
 
     @staticmethod
@@ -174,7 +177,10 @@ class Model(object):
             self.state_attack_map: np.expand_dims(s_atk_map, axis=0),
         })
         action = np.squeeze(action, axis=0)
-        action[s_legal_action == 0] = np.finfo(np.float32).min
+        action[s_legal_action == 0] = np.NINF
+        # debug
+        # print('X = ', action)
+        # print('X = ', action[action != np.NINF])
         action = softmax(action, axis=0)
         if play is False:
             # from CP_CHESS.env.environment import ChessEnv
