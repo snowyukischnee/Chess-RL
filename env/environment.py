@@ -6,7 +6,6 @@ import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../')))
 from CP_CHESS.agents.base_agent.board2state import Board2State
-# from CP_CHESS.agents.a2c_agent.board2state import Board2State0 as board2state0
 
 
 class ChessEnv(object):
@@ -37,7 +36,7 @@ class ChessEnv(object):
                                 [(l_o + x, n_o + x) for x in range(-7, 8)] + \
                                 [(l_o + x, n_o - x) for x in range(-7, 8)] + \
                                 [(l_o + x, n_o + y) for (x, y) in
-                                 [(-2, -1), (-1, -2), (-2, 1), (1, -2), (2, -1), (1, -2), (2, 1), (1, 2)]]
+                                 [(-2, -1), (-1, -2), (-2, 1), (-1, 2), (2, -1), (1, -2), (2, 1), (1, 2)]]
                 for (l_d, n_d) in _destinations:
                     if (l_o, n_o) != (l_d, n_d) and l_d in range(8) and n_d in range(8):
                         _actions.append(_letters[l_o] + _numbers[n_o] + _letters[l_d] + _numbers[n_d])
@@ -148,8 +147,15 @@ if __name__ == '__main__':
     """For testing purpose only
     """
     # game = ChessEnv()
-    # tp, a = game.reset(fen=None, board2state=board2state0)
-    # tp, a, b, c, d = game.step(928, board2state=board2state0)
+    # from CP_CHESS.agents.a2c_agent.board2state import Board2State0 as board2state0
+    # tp, a = game.reset(fen='3k4/2p5/5p1p/2Ppn3/1B2p1Qr/4P2B/7K/1N6 w - - 4 72', board2state=board2state0)
+    # print(game.board.legal_moves)
+    # print(game.board.fen(), '\n', game.board)
+    # tp, a, b, c, d = game.step(game.actions.index('g4d7'), board2state=board2state0)
+    # print(game.board.legal_moves)
+    # print(game.board.fen(), '\n', game.board)
+    # print(len(game.actions))
+    # print(game.actions)
     # print(tp)
     # # game.board.push_uci('e2e4')
     # print(game.board.is_check())

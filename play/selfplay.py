@@ -54,6 +54,7 @@ class SelfPlay(object):
                 opponent_action = self.target_player.action(state_type, opponent_state)
                 state_type, opponent_next_state, opponent_reward, done, info = self.env.step(opponent_action, board2state=board2state)
                 player_state = opponent_next_state
+                print('[opponent]state: {}, action: {}, done: {}'.format(self.env.board.fen(), self.env.actions[opponent_action], done))
                 while True:
                     timestep += 1
                     interval_clock += 1
@@ -61,7 +62,10 @@ class SelfPlay(object):
                     player_action = self.current_player.action(state_type, player_state)
                     state_type, player_next_state, player_reward, done, info = self.env.step(player_action, board2state=board2state)
                     opponent_state = player_next_state
+                    print('[player]state: {}, action: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], done))
                     if done:
+                        reward = player_reward
+                        print('[RECAP]state: {}, action: {}, reward: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], reward, done))
                         self.memory.add((player_state, actions[player_action], player_next_state, player_reward))
                         interval_clock = 0
                         self.current_player.model.learn(self.memory.sample(self.config.max_steps, continuous=True))
@@ -70,11 +74,11 @@ class SelfPlay(object):
                     # opponent's turn
                     opponent_action = self.target_player.action(state_type, opponent_state)
                     state_type, opponent_next_state, opponent_reward, done, info = self.env.step(opponent_action, board2state=board2state)
-                    reward = (player_reward - opponent_reward) / 2
+                    reward = -opponent_reward
                     self.memory.add((player_state, actions[player_action], opponent_next_state, reward))
-                    # debug
-                    print('state: {}, action: {}, reward: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], reward, done))
                     player_state = opponent_next_state
+                    print('[opponent]state: {}, action: {}, done: {}'.format(self.env.board.fen(), self.env.actions[opponent_action], done))
+                    print('[RECAP]state: {}, action: {}, reward: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], reward, done))
                     if done or interval_clock > self.config.update_interval or timestep > self.config.max_steps:
                         interval_clock = 0
                         self.current_player.model.learn(self.memory.sample(self.config.max_steps, continuous=True))
@@ -93,7 +97,10 @@ class SelfPlay(object):
                     player_action = self.current_player.action(state_type, player_state)
                     state_type, player_next_state, player_reward, done, info = self.env.step(player_action, board2state=board2state)
                     opponent_state = player_next_state
+                    print('[player]state: {}, action: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], done))
                     if done:
+                        reward = player_reward
+                        print('[RECAP]state: {}, action: {}, reward: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], reward, done))
                         self.memory.add((player_state, actions[player_action], player_next_state, player_reward))
                         interval_clock = 0
                         self.current_player.model.learn(self.memory.sample(self.config.max_steps, continuous=True))
@@ -102,10 +109,10 @@ class SelfPlay(object):
                     # opponent's turn
                     opponent_action = self.target_player.action(state_type, opponent_state)
                     state_type, opponent_next_state, opponent_reward, done, info = self.env.step(opponent_action, board2state=board2state)
-                    reward = (player_reward - opponent_reward) / 2
+                    reward = -opponent_reward
                     self.memory.add((player_state, actions[player_action], opponent_next_state, reward))
-                    # debug
-                    print('state: {}, action: {}, reward: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], reward, done))
+                    print('[opponent]state: {}, action: {}, done: {}'.format(self.env.board.fen(), self.env.actions[opponent_action], done))
+                    print('[RECAP]state: {}, action: {}, reward: {}, done: {}'.format(self.env.board.fen(), self.env.actions[player_action], reward, done))
                     player_state = opponent_next_state
                     if done or interval_clock > self.config.update_interval or timestep > self.config.max_steps:
                         interval_clock = 0
