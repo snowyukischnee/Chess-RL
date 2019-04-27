@@ -40,7 +40,7 @@ class PlayWBot(object):
                 if action_str == 'exit':
                     break
                 elif action_str == 'pass':
-                    pass
+                    self.env.pass_move()
                 else:
                     action = self.env.actions.index(action_str)
                     state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
@@ -49,7 +49,7 @@ class PlayWBot(object):
                 if done:
                     print('Game over. Score: {}'.format(self.env.result))
                     break
-                action = self.bot.action(state_type, state)
+                action = self.bot.action(state_type, state, play=True)
                 print('Bot move {}'.format(self.env.actions[action]))
                 state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
                 state = next_state
@@ -60,7 +60,7 @@ class PlayWBot(object):
         else:
             state_type, state = self.env.reset(fen=None, board2state=board2state)
             while True:
-                action = self.bot.action(state_type, state)
+                action = self.bot.action(state_type, state, play=True)
                 print('Bot move {}'.format(self.env.actions[action]))
                 state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)
                 state = next_state
@@ -72,7 +72,7 @@ class PlayWBot(object):
                 if action_str == 'exit':
                     break
                 elif action_str == 'pass':
-                    pass
+                    self.env.pass_move()
                 else:
                     action = self.env.actions.index(action_str)
                     state_type, next_state, reward, done, info = self.env.step(action, board2state=board2state)

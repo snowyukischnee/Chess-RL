@@ -105,6 +105,12 @@ class ChessEnv(object):
         _next_state = board2state.null_state(self.board, self.actions)
         return board2state.__name__, _next_state, _reward, self.done, None
 
+    def pass_move(self) -> None:
+        """ Let the opponent play by not moving any piece
+        :return:
+        """
+        self.board.turn = not self.board.turn
+
     def step(self, action: int, board2state: Board2State = None) -> Any:
         """Make an action in the environment
         :param
