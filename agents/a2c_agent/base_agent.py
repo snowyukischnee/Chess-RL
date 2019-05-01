@@ -3,7 +3,7 @@ from typing import Any
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../../')))
-from CP_CHESS.agents.base_agent.config import BaseConfig
+from CP_CHESS.agents.a2c_agent.base_config import BaseConfig
 
 
 class BaseAgent(object):

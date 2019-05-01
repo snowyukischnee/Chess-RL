@@ -2,9 +2,9 @@ import numpy as np
 
 import sys
 import os
-sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../')))
-from CP_CHESS.agents.base_agent.agent import BaseAgent
-from CP_CHESS.agents.base_agent.config import BaseConfig
+sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../../')))
+from CP_CHESS.agents.a2c_agent.base_agent import BaseAgent
+from CP_CHESS.agents.a2c_agent.base_config import BaseConfig
 from CP_CHESS.agents.a2c_agent.memory import Memory
 from CP_CHESS.env.environment import ChessEnv
 from CP_CHESS.agents.a2c_agent.board2state import Board2State0 as board2state

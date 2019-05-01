@@ -3,7 +3,7 @@ from typing import Any
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../../')))
-from CP_CHESS.agents.base_agent.agent import BaseAgent
+from CP_CHESS.agents.a2c_agent.base_agent import BaseAgent
 # from CP_CHESS.env.environment import ChessEnv
 # from CP_CHESS.agents.a2c_agent.board2state import Board2State0 as board2state
 from CP_CHESS.agents.a2c_agent.config import Config

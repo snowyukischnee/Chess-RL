@@ -1,9 +1,18 @@
-import numpy as np
+import chess
+import chess.engine
 
-X = [0.00022669, 0.00078786, 0.00047189, 0.00068644, 0.00045146, 0.00034966,
- 0.00074424, 0.00066747, 0.00062348, 0.00055907, 0.0003951,  0.0004345,
- 0.00056931, 0.00046934, 0.00038992, 0.00040468, 0.00051615, 0.00067003,
- 0.00042828, 0.0006055,  0.00085423, 0.0006455 ]
+engine = chess.engine.SimpleEngine.popen_uci('./stockfish/stockfish_win10_64')
 
-X = np.array(X, dtype=np.float32)
-print(X.sum())
+board = chess.Board()
+info = engine.analyse(board, chess.engine.Limit(time=0.1))
+print(info)
+
+board = chess.Board('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1')
+info = engine.analyse(board, chess.engine.Limit(time=0.1))
+print(info)
+
+board = chess.Board('rnbqkbnr/1ppppppp/8/p7/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2')
+info = engine.analyse(board, chess.engine.Limit(time=0.1))
+print(info)
+
+engine.quit()

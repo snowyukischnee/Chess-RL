@@ -5,7 +5,7 @@ import chess
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../')))
-from CP_CHESS.agents.base_agent.board2state import Board2State
+from CP_CHESS.utils.board2state import Board2State
 
 
 class ChessEnv(object):
@@ -90,21 +90,6 @@ class ChessEnv(object):
             _next_state = board2state.static_eval(self.board, self.actions)
         return board2state.__name__, _next_state
 
-    def resign(self, board2state: Board2State = None) -> Any:
-        """resign the game
-        :return:
-            str: type of state parser,
-            tuple(Any, float, bool, Any): next_state, reward, done, info. Following openai-gym's env
-        """
-        if self.board.turn is True:
-            self.result = '0-1'
-        else:
-            self.result = '1-0'
-        _reward = -1
-        self.done = True
-        _next_state = board2state.null_state(self.board, self.actions)
-        return board2state.__name__, _next_state, _reward, self.done, None
-
     def pass_move(self) -> None:
         """ Let the opponent play by not moving any piece
         :return:
@@ -144,7 +129,9 @@ class ChessEnv(object):
                     _reward = 0
             if board2state is not None:
                 _next_state = board2state.static_eval(self.board, self.actions)
-            return board2state.__name__, _next_state, _reward, self.done, None
+                return board2state.__name__, _next_state, _reward, self.done, None
+            else:
+                return None, self.board.fen(), _reward, self.done, None
         else:
             return 'error', board2state.static_eval(self.board, self.actions), -1, self.done, None
 
@@ -152,36 +139,5 @@ class ChessEnv(object):
 if __name__ == '__main__':
     """For testing purpose only
     """
-    # game = ChessEnv()
-    # from CP_CHESS.agents.a2c_agent.board2state import Board2State0 as board2state0
-    # tp, a = game.reset(fen='3k4/2p5/5p1p/2Ppn3/1B2p1Qr/4P2B/7K/1N6 w - - 4 72', board2state=board2state0)
-    # print(game.board.legal_moves)
-    # print(game.board.fen(), '\n', game.board)
-    # tp, a, b, c, d = game.step(game.actions.index('g4d7'), board2state=board2state0)
-    # print(game.board.legal_moves)
-    # print(game.board.fen(), '\n', game.board)
-    # print(len(game.actions))
-    # print(game.actions)
-    # print(tp)
-    # # game.board.push_uci('e2e4')
-    # print(game.board.is_check())
-    # print(game.board.was_into_check())
-    # # for action in game.actions:
-    # #     if chess.Move.from_uci(action) in game.board.legal_moves:
-    # #         print(action)
-    # # game.board.push_uci('d8e7')
-    # # game.board.push_uci('c7c8q')
-    # # print(r, d, game.result)
-    # print(game.board)
-    # # print(game.board.attackers(chess.WHITE, chess.D2))
-    # x = np.zeros(shape=(12, 64), dtype=np.int32)
-    # print(a[0].shape, a[1].shape, a[2].shape, a[3].shape, b, c, d)
-    # print(tp, a[0])
-    # # is_check() after move then if current side still check
-    # # was_into_check() the move check or not
-    # # castling_rights
-    # # turn
-    # # attacks(square)
-    # tp, a, b, c, d = game.resign(board2state0)
-    # print(tp, a[0])
+    print(len(ChessEnv.init_actions()))
     pass

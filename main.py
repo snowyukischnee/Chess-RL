@@ -6,8 +6,8 @@ import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../')))
 from CP_CHESS.agents.a2c_agent.config import Config
 from CP_CHESS.agents.a2c_agent.agent import Agent
-from CP_CHESS.play.selfplay import SelfPlayConfig, SelfPlay
-from CP_CHESS.play.playwbot import PlayConfig, PlayWBot
+from CP_CHESS.agents.a2c_agent.selfplay import SelfPlayConfig, SelfPlay
+from CP_CHESS.agents.a2c_agent.playwbot import PlayConfig, PlayWBot
 from tensorflow.python.client import device_lib
 
 

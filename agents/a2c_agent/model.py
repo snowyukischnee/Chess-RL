@@ -7,6 +7,7 @@ import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../../../')))
 from CP_CHESS.agents.a2c_agent.config import Config
+from CP_CHESS.env.environment import ChessEnv
 # for debugging
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -197,10 +198,7 @@ class Model(object):
             self.state_attack_map: np.expand_dims(s_atk_map, axis=0),
         })
         action = np.squeeze(action, axis=0)
-        print('X = ', action[action != 0], action.sum(axis=0), np.count_nonzero(s_legal_action == 1))
-        # print('Y = ', x1)
-        # print('Z = ', x2)
-        # print('X1 = ', action.sum())
+        print('X = ', action[action != 0], np.array(ChessEnv.init_actions())[action != 0])
         if play is False:
             # from CP_CHESS.env.environment import ChessEnv
             # actions = ChessEnv.init_actions()
