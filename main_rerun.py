@@ -1,12 +1,12 @@
 import argparse
-from random import getrandbits
+from tensorflow.python.client import device_lib
+
 
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), '../')))
 from CP_CHESS.agents.a2c_agent_rerun.a2c import A2C, PlayWBot
-from tensorflow.python.client import device_lib
-
+from CP_CHESS.utils.playwengine import PlayWEngine
 
 def get_available_devices():
     local_devices = device_lib.list_local_devices()
@@ -37,4 +37,6 @@ if __name__ == '__main__':
         pwb = PlayWBot(model_dir='./model', model_ver=args.version)
         pwb.play(player_white_pieces=not args.black)
     else:
-        print('No parameters supplied. Do nothing!')
+        print('Play with stockfish')
+        pwe = PlayWEngine(bin_path='./stockfish/stockfish_win10_64', timelimit=0.1)
+        pwe.play(player_white_pieces=not args.black)
