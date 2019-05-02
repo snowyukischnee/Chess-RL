@@ -60,7 +60,7 @@ class A2C(object):
             save_path = self.model.save('{}/model{}/model.ckpt'.format(model_dir, model_ver))
             print('initial model saved at {}'.format(save_path))
 
-    def train(self, n_eps: int = 100):
+    def train(self, n_eps: int = 100) -> None:
         for episode in range(1, n_eps + 1):
             print('Episode {}'.format(episode))
             if episode % A2CConfig.decay_interval == 0:
@@ -76,7 +76,7 @@ class A2C(object):
                 player_action = self.model.act(player_state)
                 print('state: {}, action: {}'.format(self.env.env.board.fen(), self.env.env.actions[player_action]))
                 state_type, player_next_state, reward, done, info = self.env.step(player_action)
-                print('next_state: {}, done: {}'.format(self.env.env.board.fen(), done))
+                print('next_state: {}, reward: {}, done: {}'.format(self.env.env.board.fen(), reward, done))
                 self.memory.add((player_state, actions[player_action], player_next_state, reward))
                 if done or interval_clock > A2CConfig.update_interval or timestep > A2CConfig.max_steps:
                     interval_clock = 0
@@ -134,3 +134,49 @@ class PlayWBot(object):
             if done:
                 print('Reward: {}'.format(reward))
                 break
+
+
+class Test(object):
+    def __init__(self, model_dir: str = None, model_ver: int = None, opponent_model_dir: str = None, opponent_model_ver: int = None):
+        if model_dir is None:
+            model_dir = './model'
+        if model_ver is None:
+            model_ver = 0
+        if opponent_model_dir is None:
+            opponent_model_dir = './model'
+        if opponent_model_ver is None:
+            opponent_model_ver = 0
+        # model
+        self.model = Model(gpu_idx=None)
+        self.load_model(self.model, model_dir, model_ver)
+        # opponent
+        self.opponent = Model(gpu_idx=None)
+        self.load_model(self.opponent, opponent_model_dir, opponent_model_ver)
+        # env
+        self.env = ChessEnvWrapper(self.opponent)
+
+    def load_model(self, model: Model, model_dir: str, model_ver: int) -> None:
+            model.load('{}/model{}/model.ckpt'.format(model_dir, model_ver))
+            print('model{} at {} was loaded'.format(model_dir, model_ver))
+
+    def run(self, n_eps: int = 100) -> None:
+        w, d, l = 0, 0, 0
+        for episode in range(1, n_eps + 1):
+            print('Episode {}'.format(episode))
+            state_type, player_state = self.env.reset(player_white_pieces=not getrandbits(1))
+            while True:
+                player_action = self.model.act(player_state)
+                print('state: {}, action: {}'.format(self.env.env.board.fen(), self.env.env.actions[player_action]))
+                state_type, player_next_state, reward, done, info = self.env.step(player_action)
+                print('next_state: {}, done: {}'.format(self.env.env.board.fen(), done))
+                if done:
+                    print('Game ended, reward = {}'.format(reward))
+                    if reward == 1:
+                        w += 1
+                    elif reward == 0:
+                        d += 1
+                    elif reward == -1:
+                        l += 1
+                    break
+                player_state = player_next_state
+        print('Win: {}, Draw: {}, Loss: {}'.format(w, d, l))
